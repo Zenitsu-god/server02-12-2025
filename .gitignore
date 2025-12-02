@@ -1,0 +1,39 @@
+# --- ENVIRONMENT FILES ---
+.env
+.env.local
+.env.production
+.env.development
+.env.test
+
+# --- NODE MODULES ---
+node_modules/
+
+# --- LOG FILES ---
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- DIST / BUILD / CACHE ---
+dist/
+build/
+.cache/
+.tmp/
+coverage/
+
+# --- SYSTEM FILES ---
+.DS_Store
+Thumbs.db
+
+# --- EDITOR SETTINGS ---
+.vscode/
+.idea/
+*.swp
+
+# --- RAILWAY / DEPLOYMENT ---
+.vercel/
+.netlify/
+railway.toml
+
+# --- MISC ---
+*.log
