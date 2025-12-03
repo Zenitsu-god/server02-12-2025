@@ -1,5 +1,6 @@
 import express from "express";
-import mongoose from "mongoose";
+// import mongoose from "mongoose";   // ⛔ MongoDB disabled
+import { PrismaClient } from "@prisma/client"; // ✅ Postgres + Prisma
 import { ethers } from "ethers";
 import dotenv from "dotenv";
 
@@ -9,29 +10,32 @@ const app = express();
 app.use(express.json());
 
 // -----------------------------
-//  CONNECT MONGODB
+//  CONNECT POSTGRES (via Prisma)
 // -----------------------------
-async function connectDB() {
+const prisma = new PrismaClient();
+
+(async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URL);
-    console.log("MongoDB Connected");
+    await prisma.$connect();
+    console.log("Postgres Connected");
   } catch (err) {
-    console.error("MongoDB Connection Failed:", err.message);
+    console.error("Postgres Connection Failed:", err.message);
   }
-}
-connectDB();
+})();
 
 // -----------------------------
-//  USER MODEL
+//  USER MODEL (Mongo → Prisma)
 // -----------------------------
-const UserSchema = new mongoose.Schema({
-  address: { type: String, required: true },
-  timestamp: { type: Date, default: Date.now },
-});
-const UserModel = mongoose.model("User", UserSchema);
+// MongoDB version (kept commented, you asked not to remove anything)
+//
+// const UserSchema = new mongoose.Schema({
+//   address: { type: String, required: true },
+//   timestamp: { type: Date, default: Date.now },
+// });
+// const UserModel = mongoose.model("User", UserSchema);
 
 // -----------------------------
-//  STORE USER
+//  STORE USER  (now uses Postgres)
 // -----------------------------
 app.post("/store-user", async (req, res) => {
   try {
@@ -39,7 +43,13 @@ app.post("/store-user", async (req, res) => {
 
     if (!address) return res.json({ success: false, error: "Address required" });
 
-    await UserModel.create({ address });
+    // Prisma (Postgres)
+    await prisma.user.create({
+      data: {
+        address,
+        timestamp: new Date(),
+      },
+    });
 
     res.json({
       success: true,
